@@ -5,6 +5,9 @@ const path = require('path');
 const CONFIG = './xd.json';
 const PHOTO_DIR = './photos';
 const DEFAULT_PHOTO = 'KAKADDI.jpg';
+const UI = { reset:'\x1b[0m', cyan:'\x1b[36m', green:'\x1b[32m', yellow:'\x1b[33m', red:'\x1b[31m', bold:'\x1b[1m', dim:'\x1b[2m' };
+function ui(c,t){ return UI[c] + t + UI.reset; }
+
 const DEFAULT_NAME = 'SHAO DIOS DEL UNIVERSO Y FACEBOOK VIOLA A MONADDI, MONORDAN, KAKAFAELA Y A TODOS SU MARIDOS 🤑👌🐶';
 
 if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
@@ -36,9 +39,9 @@ function ensureGroup(group) {
 }
 
 function showGroups(config) {
-  console.log('\n╭────────────────────────────────────────────╮');
-  console.log('│              📋 MIS GRUPOS                 │');
-  console.log('╰────────────────────────────────────────────╯\n');
+  console.log(ui('cyan','\n╭────────────────────────────────────────────╮'));
+  console.log(ui('bold','│              ✦ 📋 MIS GRUPOS ✦            │'));
+  console.log(ui('cyan','╰────────────────────────────────────────────╯\n'));
   if (!config.groups.length) { console.log('⚠️ No hay grupos registrados.\n'); return; }
   config.groups.forEach((group, i) => {
     ensureGroup(group);
@@ -138,9 +141,9 @@ async function configureGroupMenu(config) {
   const { group, index } = selected;
 
   while (true) {
-    console.log('\n╭────────────────────────────────────────────╮');
-    console.log(`│        ⚙️ CONFIGURACIÓN ${xdName(index).padEnd(21)}│`);
-    console.log('╰────────────────────────────────────────────╯');
+    console.log(ui('cyan','\n╭────────────────────────────────────────────╮'));
+    console.log(ui('bold',`│        ⚙️ CONFIGURACIÓN ${xdName(index).padEnd(21)}│`));
+    console.log(ui('cyan','╰────────────────────────────────────────────╯'));
     console.log(`🆔 ID: ${group.id}`);
     console.log(`📝 Nombre: ${group.nameEnabled ? (group.name || '(sin configurar)') : '🔴 DESACTIVADO'}`);
     console.log(`🖼️ Foto: ${group.photoEnabled ? (group.photo || '(sin configurar)') : '🔴 DESACTIVADA'}`);
@@ -213,19 +216,19 @@ async function menu() {
   saveConfig(config);
   console.clear();
   console.log('');
-  console.log('╔════════════════════════════════════════════╗');
-  console.log('║                                            ║');
-  console.log('║          🤖  CONTROL MESSENGER             ║');
-  console.log('║                                            ║');
-  console.log('╚════════════════════════════════════════════╝');
+  console.log(ui('cyan','╔════════════════════════════════════════════╗'));
+  console.log(ui('cyan','║                                            ║'));
+  console.log(ui('bold','║          ✦ 🤖 CONTROL MESSENGER ✦         ║'));
+  console.log(ui('cyan','║                                            ║'));
+  console.log(ui('cyan','╚════════════════════════════════════════════╝'));
   console.log('');
   console.log('┌────────────────────────────────────────────┐');
   console.log(`│  ⏱️  Ciclo       : ${String(config.cycleMinutes).padEnd(24)}│`);
   console.log(`│  ⏳  Separación  : ${String(config.separationSeconds).padEnd(24)}│`);
   console.log('└────────────────────────────────────────────┘');
   showGroups(config);
-  console.log('╭────────────────────────────────────────────╮');
-  console.log('│                📌 MENÚ PRINCIPAL           │');
+  console.log(ui('cyan','╭────────────────────────────────────────────╮'));
+  console.log(ui('bold','│             📌 MENÚ PRINCIPAL              │'));
   console.log('├────────────────────────────────────────────┤');
   console.log('│  1️⃣  ⚙️  Configurar tiempos                │');
   console.log('│  2️⃣  📋  Ver grupos                        │');
@@ -234,7 +237,7 @@ async function menu() {
   console.log('│  5️⃣  ➕  Agregar grupo                     │');
   console.log('│  6️⃣  🗑️  Eliminar grupo                   │');
   console.log('│  7️⃣  ❌  Salir                             │');
-  console.log('╰────────────────────────────────────────────╯');
+  console.log(ui('cyan','╰────────────────────────────────────────────╯'));
 
   const option = await ask('\n¿Qué quieres hacer?\n> ');
   switch (option) {
