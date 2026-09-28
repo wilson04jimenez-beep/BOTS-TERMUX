@@ -2,6 +2,10 @@ const { Client } = require('discord.js-selfbot-v13');
 const fs = require('fs');
 const path = require('path');
 
+const UI = { reset:'\x1b[0m', cyan:'\x1b[36m', green:'\x1b[32m', yellow:'\x1b[33m', red:'\x1b[31m', bold:'\x1b[1m' };
+const ui = (c,t) => UI[c] + t + UI.reset;
+const panel = t => { console.log(''); console.log(ui('cyan','╔'+'═'.repeat(52)+'╗')); console.log(ui('cyan','║ '+t)); console.log(ui('cyan','╚'+'═'.repeat(52)+'╝')); };
+
 const client = new Client({
   checkUpdate: false
 });
@@ -317,23 +321,13 @@ client.on(
   'ready',
   async () => {
 
-    console.log(
-      '================================='
-    );
+    panel('✦ INSULTOS · XD4 · CONECTADO ✦');
 
-    console.log(
-      '¡Conectado como ' +
-      client.user.tag +
-      '!'
-    );
+    console.log(ui('green', '🟢 Cuenta: ' + client.user.tag));
 
-    console.log(
-      '(Insultos / XD4)'
-    );
+    console.log(ui('cyan', '💬 Modo: Insultos / XD4'));
 
-    console.log(
-      '================================='
-    );
+    
 
     await restoreSavedStates();
 
