@@ -1,0 +1,1201 @@
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    normalizeMessageContent
+} = require('@whiskeysockets/baileys');
+
+const pino = require('pino');
+const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+
+const AUTH_DIR = path.join(__dirname, 'auth');
+const BLOQUEADOS_FILE = path.join(__dirname, 'bloqueados.json');
+
+const MUSIC_API = 'http://127.0.0.1:3000';
+
+
+// ==================================================
+// BLOQUEADOS
+// ==================================================
+
+function cargarBloqueados() {
+    try {
+        if (!fs.existsSync(BLOQUEADOS_FILE)) {
+            fs.writeFileSync(
+                BLOQUEADOS_FILE,
+                '[]',
+                'utf8'
+            );
+
+            return [];
+        }
+
+        const datos = JSON.parse(
+            fs.readFileSync(
+                BLOQUEADOS_FILE,
+                'utf8'
+            )
+        );
+
+        if (!Array.isArray(datos)) {
+            return [];
+        }
+
+        // Compatibilidad con formato antiguo:
+        // ["573001234567@s.whatsapp.net"]
+        //
+        // Se convierte automáticamente al formato nuevo.
+        if (
+            datos.length > 0 &&
+            typeof datos[0] === 'string'
+        ) {
+            return datos.map(usuario => ({
+                chat: '*',
+                usuario: normalizarJid(usuario)
+            }));
+        }
+
+        return datos.filter(
+            x =>
+                x &&
+                x.chat &&
+                x.usuario
+        );
+
+    } catch {
+        return [];
+    }
+}
+
+
+function guardarBloqueados(lista) {
+    try {
+        fs.writeFileSync(
+            BLOQUEADOS_FILE,
+            JSON.stringify(
+                lista,
+                null,
+                2
+            ),
+            'utf8'
+        );
+    } catch (error) {
+        console.log(
+            'Error guardando bloqueados:',
+            error.message
+        );
+    }
+}
+
+
+function normalizarJid(jid) {
+    if (!jid) {
+        return null;
+    }
+
+    return String(jid)
+        .replace(/:\d+(?=@)/, '')
+        .trim();
+}
+
+
+function estaBloqueado(chat, usuario) {
+
+    chat = normalizarJid(chat);
+    usuario = normalizarJid(usuario);
+
+    if (!chat || !usuario) {
+        return false;
+    }
+
+    const lista =
+        cargarBloqueados();
+
+    return lista.some(
+        item =>
+            normalizarJid(item.chat) === chat &&
+            normalizarJid(item.usuario) === usuario
+    );
+}
+
+
+function bloquearUsuario(chat, usuario) {
+
+    chat = normalizarJid(chat);
+    usuario = normalizarJid(usuario);
+
+    if (!chat || !usuario) {
+        return;
+    }
+
+    const lista =
+        cargarBloqueados();
+
+    const existe =
+        lista.some(
+            item =>
+                normalizarJid(item.chat) === chat &&
+                normalizarJid(item.usuario) === usuario
+        );
+
+    if (!existe) {
+
+        lista.push({
+            chat,
+            usuario
+        });
+
+        guardarBloqueados(lista);
+    }
+}
+
+
+function desbloquearUsuario(chat, usuario) {
+
+    chat = normalizarJid(chat);
+    usuario = normalizarJid(usuario);
+
+    if (!chat || !usuario) {
+        return;
+    }
+
+    let lista =
+        cargarBloqueados();
+
+    lista =
+        lista.filter(
+            item =>
+                !(
+                    normalizarJid(item.chat) === chat &&
+                    normalizarJid(item.usuario) === usuario
+                )
+        );
+
+    guardarBloqueados(lista);
+}
+
+
+// ==================================================
+// CONTEXTO DE RESPUESTA / MENCIÓN
+// ==================================================
+
+function obtenerContexto(msg) {
+
+    const contenido =
+        normalizeMessageContent(
+            msg.message
+        ) || msg.message;
+
+    return (
+        contenido?.extendedTextMessage
+            ?.contextInfo ||
+        contenido?.imageMessage
+            ?.contextInfo ||
+        contenido?.videoMessage
+            ?.contextInfo ||
+        contenido?.documentMessage
+            ?.contextInfo ||
+        null
+    );
+}
+
+
+function obtenerObjetivo(msg) {
+
+    const contexto =
+        obtenerContexto(msg);
+
+    if (!contexto) {
+        return null;
+    }
+
+    // Primero: mensaje respondido
+    if (contexto.participant) {
+
+        return normalizarJid(
+            contexto.participant
+        );
+rxf55555uoó    }
+
+    // Segundo: persona mencionada
+    if (
+        Array.isArray(
+            contexto.mentionedJid
+        ) &&
+        contexto.mentionedJid.length > 0
+    ) {
+
+        return normalizarJid(
+            contexto.mentionedJid[0]
+        );
+    }
+
+    return null;
+}
+
+
+function obtenerKeyRespondido(msg) {
+
+    const contexto =
+        obtenerContexto(msg);
+
+    if (!contexto?.stanzaId) {
+        return null;
+    }
+
+    return {
+        remoteJid:
+            msg.key.remoteJid,
+
+        id:
+            contexto.stanzaId,
+
+        participant:
+            contexto.participant,
+
+        fromMe: false
+    };
+}
+
+
+// ==================================================
+// ELIMINAR MENSAJE
+// ==================================================
+
+async function eliminarMensaje(sock, key) {
+
+    if (!key?.remoteJid || !key?.id) {
+        return false;
+    }
+
+    try {
+
+        await sock.sendMessage(
+            key.remoteJid,
+            {
+                delete: key
+            }
+        );
+
+        return true;
+
+    } catch {
+
+        return false;
+    }
+}
+
+
+// ==================================================
+// HTTP PARA MUSIC API
+// ==================================================
+
+function apiPost(endpoint, data) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const body =
+                JSON.stringify(data);
+
+            const url =
+                new URL(
+                    MUSIC_API + endpoint
+                );
+
+            const req =
+                http.request(
+                    {
+                        hostname:
+                            url.hostname,
+
+                        port:
+                            url.port,
+
+                        path:
+                            url.pathname,
+
+                        method:
+                            'POST',
+
+                        headers: {
+                            'Content-Type':
+                                'application/json',
+
+                            'Content-Length':
+                                Buffer.byteLength(
+                                    body
+                                )
+                        }
+                    },
+
+                    res => {
+
+                        const chunks = [];
+
+                        res.on(
+                            'data',
+                            chunk =>
+                                chunks.push(chunk)
+                        );
+
+                        res.on(
+                            'end',
+                            () => {
+
+                                const buffer =
+                                    Buffer.concat(
+                                        chunks
+                                    );
+
+                                if (
+                                    res.statusCode < 200 ||
+                                    res.statusCode >= 300
+                                ) {
+
+                                    let mensaje =
+                                        'Error de Music API';
+
+                                    try {
+
+                                        const datos =
+                                            JSON.parse(
+                                                buffer.toString()
+                                            );
+
+                                        mensaje =
+                                            datos.error ||
+                                            mensaje;
+
+                                    } catch {}
+
+                                    reject(
+                                        new Error(
+                                            mensaje
+                                        )
+                                    );
+
+                                    return;
+                                }
+
+                                resolve({
+                                    headers:
+                                        res.headers,
+
+                                    buffer
+                                });
+                            }
+                        );
+                    }
+                );
+
+            req.on(
+                'error',
+                reject
+            );
+
+            req.write(body);
+            req.end();
+        }
+    );
+}
+
+
+// ==================================================
+// CONEXIÓN
+// ==================================================
+
+async function conectarWhatsApp() {
+
+    const {
+        state,
+        saveCreds
+    } =
+        await useMultiFileAuthState(
+            AUTH_DIR
+        );
+
+
+    const sock =
+        makeWASocket({
+
+            auth: state,
+
+            logger:
+                pino({
+                    level: 'silent'
+                }),
+
+            printQRInTerminal:
+                false,
+
+            browser: [
+                'Chrome',
+                'Linux',
+                '120.0.0'
+            ],
+
+            markOnlineOnConnect:
+                false
+        });
+
+
+    // ==================================================
+    // PROPIETARIO
+    // ==================================================
+
+    function esPropietario(jid) {
+
+        if (!jid || !sock.user) {
+            return false;
+        }
+
+        const sender =
+            normalizarJid(jid);
+
+        const miNumero =
+            normalizarJid(
+                sock.user.id
+            );
+
+        const miLid =
+            normalizarJid(
+                sock.user.lid
+            );
+
+        return (
+            sender === miNumero ||
+            sender === miLid
+        );
+    }
+
+
+    // ==================================================
+    // CONEXIÓN
+    // ==================================================
+
+    sock.ev.on(
+        'connection.update',
+        async update => {
+
+            const {
+                connection,
+                lastDisconnect,
+                qr
+            } = update;
+
+
+            if (qr) {
+
+                console.log(
+                    '\n📱 ESCANEA ESTE QR:\n'
+                );
+
+                qrcode.generate(
+                    qr,
+                    {
+                        small: true
+                    }
+                );
+            }
+
+
+            if (
+                connection === 'open'
+            ) {
+
+                const bloqueados =
+                    cargarBloqueados();
+
+                console.log(
+                    '\n========================================'
+                );
+
+                console.log(
+                    '✅ WHATSAPP CONECTADO'
+                );
+
+                console.log(
+                    '========================================'
+                );
+
+                console.log(
+                    `👑 Propietario: ${normalizarJid(sock.user?.id)}`
+                );
+
+                console.log(
+                    `🔇 Bloqueados: ${bloqueados.length}`
+                );
+
+                console.log();
+            }
+
+
+            if (
+                connection === 'close'
+            ) {
+
+                const statusCode =
+                    lastDisconnect
+                        ?.error
+                        ?.output
+                        ?.statusCode;
+
+
+                if (
+                    statusCode !==
+                    DisconnectReason.loggedOut
+                ) {
+
+                    console.log(
+                        '🔄 Reconectando...'
+                    );
+
+                    setTimeout(
+                        () =>
+                            conectarWhatsApp(),
+                        3000
+                    );
+
+                } else {
+
+                    console.log(
+                        '❌ Sesión cerrada.'
+                    );
+                }
+            }
+        }
+    );
+
+
+    sock.ev.on(
+        'creds.update',
+        saveCreds
+    );
+
+
+    // ==================================================
+    // MENSAJES
+    // ==================================================
+
+    sock.ev.on(
+        'messages.upsert',
+        async ({ messages }) => {
+
+            for (
+                const m of messages
+            ) {
+
+                try {
+
+                    if (!m?.message) {
+                        continue;
+                    }
+
+
+                    const remoteJid =
+                        m.key.remoteJid;
+
+                    if (!remoteJid) {
+                        continue;
+                    }
+
+
+                    // ======================================
+                    // CONTENIDO NORMALIZADO
+                    // ======================================
+
+                    const contenido =
+                        normalizeMessageContent(
+                            m.message
+                        ) || m.message;
+
+
+                    // ======================================
+                    // REMITENTE
+                    // ======================================
+
+                    let messageSender;
+
+                    if (
+                        m.key.fromMe
+                    ) {
+
+                        messageSender =
+                            sock.user?.id;
+
+                    } else {
+
+                        messageSender =
+                            m.key.participant ||
+                            m.participant ||
+                            remoteJid;
+                    }
+
+
+                    messageSender =
+                        normalizarJid(
+                            messageSender
+                        );
+
+
+                    // ======================================
+                    // PROPIETARIO
+                    // ======================================
+
+                    const propietario =
+                        esPropietario(
+                            messageSender
+                        );
+
+
+                    // ======================================
+                    // TEXTO
+                    // ======================================
+
+                    const messageContent =
+                        contenido
+                            ?.conversation ||
+
+                        contenido
+                            ?.extendedTextMessage
+                            ?.text ||
+
+                        contenido
+                            ?.imageMessage
+                            ?.caption ||
+
+                        contenido
+                            ?.videoMessage
+                            ?.caption ||
+
+                        contenido
+                            ?.documentMessage
+                            ?.caption ||
+
+                        '';
+
+
+                    const texto =
+                        String(
+                            messageContent
+                        ).trim();
+
+
+                    const textoUpper =
+                        texto.toUpperCase();
+
+
+                    // ======================================
+                    // XD1
+                    // ======================================
+                    //
+                    // Respondes al mensaje de alguien:
+                    //
+                    // XD1
+                    //
+                    // Esa persona queda bloqueada
+                    // SOLO EN ESE CHAT.
+                    //
+                    // Sus mensajes posteriores se eliminan.
+                    //
+                    // ======================================
+
+                    if (
+                        textoUpper === 'XD1'
+                    ) {
+
+                        if (!propietario) {
+                            continue;
+                        }
+
+
+                        const objetivo =
+                            obtenerObjetivo(m);
+
+
+                        if (!objetivo) {
+
+                            console.log(
+                                '⚠️ XD1 necesita responder a un mensaje.'
+                            );
+
+                            continue;
+                        }
+
+
+                        if (
+                            esPropietario(
+                                objetivo
+                            )
+                        ) {
+                            continue;
+                        }
+
+
+                        // Bloquear en ESTE chat
+                        bloquearUsuario(
+                            remoteJid,
+                            objetivo
+                        );
+
+
+                        // Eliminar el mensaje al
+                        // que respondiste
+                        const keyRespondido =
+                            obtenerKeyRespondido(
+                                m
+                            );
+
+
+                        if (
+                            keyRespondido
+                        ) {
+
+                            await eliminarMensaje(
+                                sock,
+                                keyRespondido
+                            );
+                        }
+
+
+                        // Eliminar XD1
+                        await eliminarMensaje(
+                            sock,
+                            m.key
+                        );
+
+
+                        // SIN RESPUESTA
+                        continue;
+                    }
+
+
+                    // ======================================
+                    // XD2
+                    // ======================================
+                    //
+                    // Respondes al mensaje de la persona:
+                    //
+                    // XD2
+                    //
+                    // Se desbloquea SOLO EN ESE CHAT.
+                    //
+                    // ======================================
+
+                    if (
+                        textoUpper === 'XD2' ||
+                        textoUpper.startsWith('XD2 ')
+                    ) {
+
+                        if (!propietario) {
+                            continue;
+                        }
+
+
+                        let objetivo =
+                            obtenerObjetivo(m);
+
+
+                        // También permite:
+                        // XD2 + mención
+                        if (
+                            !objetivo
+                        ) {
+
+                            const contexto =
+                                obtenerContexto(
+                                    m
+                                );
+
+                            if (
+                                contexto
+                                    ?.mentionedJid
+                                    ?.length
+                            ) {
+
+                                objetivo =
+                                    normalizarJid(
+                                        contexto
+                                            .mentionedJid[0]
+                                    );
+                            }
+                        }
+
+
+                        if (!objetivo) {
+
+                            console.log(
+                                '⚠️ XD2 necesita responder o mencionar a alguien.'
+                            );
+
+                            continue;
+                        }
+
+
+                        if (
+                            !esPropietario(
+                                objetivo
+                            )
+                        ) {
+
+                            desbloquearUsuario(
+                                remoteJid,
+                                objetivo
+                            );
+                        }
+
+
+                        // Eliminar XD2
+                        await eliminarMensaje(
+                            sock,
+                            m.key
+                        );
+
+
+                        // SIN RESPUESTA
+                        continue;
+                    }
+
+
+                    // ======================================
+                    // ELIMINAR MENSAJES BLOQUEADOS
+                    // ======================================
+                    //
+                    // MUY IMPORTANTE:
+                    //
+                    // Solo elimina mensajes de otros.
+                    // Nunca elimina mensajes propios.
+                    //
+                    // Además, el bloqueo es por chat.
+                    //
+                    // ======================================
+
+                    if (
+                        !m.key.fromMe &&
+                        estaBloqueado(
+                            remoteJid,
+                            messageSender
+                        )
+                    ) {
+
+                        await eliminarMensaje(
+                            sock,
+                            m.key
+                        );
+
+                        continue;
+                    }
+
+
+                    // Si no hay texto,
+                    // no seguimos con comandos.
+                    if (!texto) {
+                        continue;
+                    }
+
+
+                    // ======================================
+                    // #FOTO
+                    // ======================================
+
+                    if (
+                        texto.toLowerCase() ===
+                        '#foto'
+                    ) {
+
+                        if (!propietario) {
+                            continue;
+                        }
+
+
+                        let objetivo =
+                            obtenerObjetivo(m);
+
+
+                        // Si no respondió ni mencionó,
+                        // intenta usar al remitente.
+                        if (!objetivo) {
+
+                            objetivo =
+                                messageSender;
+                        }
+
+
+                        try {
+
+                            const foto =
+                                await sock.profilePictureUrl(
+                                    objetivo,
+                                    'image'
+                                );
+
+
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    image: {
+                                        url: foto
+                                    },
+
+                                    caption:
+                                        '📸✨ Foto encontrada'
+                                }
+                            );
+
+                        } catch {
+
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    text:
+                                        '❌ No se pudo obtener la foto de perfil.'
+                                }
+                            );
+                        }
+
+
+                        continue;
+                    }
+
+
+                    // ======================================
+                    // #MUSIC
+                    // ======================================
+
+                    if (
+                        texto
+                            .toLowerCase()
+                            .startsWith('#music')
+                    ) {
+
+                        const query =
+                            texto
+                                .slice(6)
+                                .trim();
+
+
+                        if (!query) {
+
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    text:
+                                        '❌ Escribe el nombre de una canción.'
+                                }
+                            );
+
+                            continue;
+                        }
+
+
+                        try {
+
+                            // ==================================
+                            // BUSCAR EN MUSIC API
+                            // ==================================
+
+                            const busqueda =
+                                await apiPost(
+                                    '/search',
+                                    {
+                                        query
+                                    }
+                                );
+
+
+                            const datos =
+                                JSON.parse(
+                                    busqueda.buffer.toString()
+                                );
+
+
+                            if (
+                                !datos.ok ||
+                                !datos.url
+                            ) {
+
+                                throw new Error(
+                                    datos.error ||
+                                    'No encontré la canción.'
+                                );
+                            }
+
+
+                            const titulo =
+                                datos.title ||
+                                query;
+
+
+                            const artista =
+                                datos.uploader ||
+                                'Desconocido';
+
+
+                            // ==================================
+                            // CAPTION
+                            // ==================================
+
+                            const caption =
+`🔎 Buscando canción ${query}...
+
+🎵 ${titulo}
+👤 Artista: ${artista}
+💿 Álbum: información no disponible`;
+
+
+                            // ==================================
+                            // MINIATURA
+                            // ==================================
+
+                            if (
+                                datos.thumbnail
+                            ) {
+
+                                try {
+
+                                    await sock.sendMessage(
+                                        remoteJid,
+                                        {
+                                            image: {
+                                                url:
+                                                    datos.thumbnail
+                                            },
+
+                                            caption
+                                        }
+                                    );
+
+                                } catch {
+
+                                    await sock.sendMessage(
+                                        remoteJid,
+                                        {
+                                            text:
+                                                caption
+                                        }
+                                    );
+                                }
+
+                            } else {
+
+                                await sock.sendMessage(
+                                    remoteJid,
+                                    {
+                                        text:
+                                            caption
+                                    }
+                                );
+                            }
+
+
+                            // ==================================
+                            // DESCARGAR
+                            // ==================================
+
+                            const descarga =
+                                await apiPost(
+                                    '/download',
+                                    {
+                                        url:
+                                            datos.url,
+
+                                        title:
+                                            titulo
+                                    }
+                                );
+
+
+                            const extension =
+                                String(
+                                    descarga
+                                        .headers[
+                                            'content-type'
+                                        ] || ''
+                                )
+                                    .includes(
+                                        'audio/mp4'
+                                    )
+                                    ? '.m4a'
+                                    : '.mp3';
+
+
+                            // ==================================
+                            // ENVIAR AUDIO
+                            // ==================================
+
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    audio:
+                                        descarga.buffer,
+
+                                    mimetype:
+                                        extension === '.m4a'
+                                            ? 'audio/mp4'
+                                            : 'audio/mpeg',
+
+                                    fileName:
+                                        titulo
+                                            .replace(
+                                                /[\\/:*?"<>|]/g,
+                                                ''
+                                            )
+                                            .slice(
+                                                0,
+                                                100
+                                            ) +
+                                        extension,
+
+                                    ptt:
+                                        false
+                                }
+                            );
+
+
+                        } catch (error) {
+
+                            console.log(
+                                'Error #music:',
+                                error.message
+                            );
+
+
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    text:
+                                        '❌ No pude descargar esa canción.'
+                                }
+                            );
+                        }
+
+
+                        continue;
+                    }
+
+                } catch (error) {
+
+                    console.log(
+                        '❌ Error procesando mensaje:',
+                        error.message
+                    );
+                }
+            }
+        }
+    );
+}
+
+
+// ==================================================
+// INICIAR
+// ==================================================
+
+console.log(
+    '🚀 Iniciando WhatsApp Bot...'
+);
+
+conectarWhatsApp();

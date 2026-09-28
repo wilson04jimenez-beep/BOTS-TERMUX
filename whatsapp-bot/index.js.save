@@ -1,0 +1,77 @@
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const qrcode = require('qrcode-terminal');
+
+// Puedes poner aquí tanto el número tradicional como el ID de LID que te apareció en la consola
+const usuariosBloqueados = ["522296583118", "263789056368729"];
+
+            }
+        } else if (connection === 'open') {
+            console.log('¡Bot conectado exitosamente a WhatsApp!');
+        }
+    });
+
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+        const m = messages[0];
+async function connectToWhatsApp() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+
+    const sock = makeWASocket({
+        auth: state,
+        logger: pino({ level: 'silent' })
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            console.log('Escanea este código QR con tu WhatsApp:');
+            qrcode.generate(qr, { small: true });
+        }
+
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('Conexión cerrada. Reconectando...', shouldReconnect);
+            if (shouldReconnect) {
+                connectToWhatsApp();
+            }
+        } else if (connection === 'open') {
+            console.log('¡Bot conectado exitosamente a WhatsApp!');
+        }
+    });
+
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+        const m = messages[0];
+        if (!m.message) return;
+
+        const remoteJid = m.key.remoteJid;
+        const sender = m.key.participant || m.key.remoteJid;
+
+        if (remoteJid.endsWith('@g.us')) {
+            // Extraer el identificador completo o la base antes del '@'
+            const senderId = sender.split('@')[0];
+            const fullSender = sender; // Para verificar también si incluye @lid completo si es necesario
+
+            // Comprobamos si el remitente está en la lista (ya sea por número o por su LID)
+            if (usuariosBloqueados.includes(senderId) || usuariosBloqueados.includes(fullSender)) {
+                try {
+                    await sock.sendMessage(remoteJid, {
+                        delete: {
+                            remoteJid: remoteJid,
+                            fromMe: false,
+                            id: m.key.id,
+                            participant: sender
+                        }
+                    });
+                    console.log(`¡Mensaje eliminado con éxito de: ${senderId}!`);
+                } catch (error) {
+                    console.log('No se pudo eliminar el mensaje. ¿Es el bot administrador?', error);
+                }
+            }
+        }
+    });
+}
+
+connectToWhatsApp();

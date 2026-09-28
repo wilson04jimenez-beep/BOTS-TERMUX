@@ -1,0 +1,106 @@
+    queueMap.clear();
+
+    const queueState = { currentIndex: 0, isRunning: true };
+    queueMap.set(message.channel.id, queueState);
+
+    runQueue(message.channel, queueState);
+  }
+
+  // Comando XD3 (Matanza general)
+  if (command === 'XD3') {
+    if (activeInterval) {
+      clearInterval(activeInterval);
+      activeInterval = null;
+    }
+
+    if (queueMap.size > 0) {
+      queueMap.forEach((queueState) => {
+        queueState.isRunning = false;
+      });
+      queueMap.clear();
+    }
+
+    message.channel.send('¡Todo detenido con éxito!');
+  }
+});
+
+// --- FUNCIÓN DE LA COLA ---
+async function runQueue(channel, queueState) {
+  const filter = (msg) => msg.author.id !== client.user.id;
+
+  while (queueState.isRunning) {
+    console.log('[Cola] Esperando a que otro usuario hable...');
+
+    let collectedMessages = [];
+    try {
+      // 1. Esperar el primer mensaje del otro usuario
+      const firstMsg = await channel.awaitMessages({
+        filter,
+        max: 1,
+        time: 86400000, // 24 horas máximo de espera
+        errors: ['time']
+      });
+
+      if (!queueState.isRunning) break;
+      collectedMessages.push(firstMsg.first());
+
+      // 2. Recoger si manda más mensajes seguidos en una ventana de 3 segundos
+      const collector = channel.createMessageCollector({
+        filter,
+        time: 3000 
+      });
+
+      await new Promise((resolve) => {
+        collector.on('collect', (msg) => {
+          collectedMessages.push(msg);
+        });
+        collector.on('end', () => {
+          resolve();
+        });
+      });
+
+      if (!queueState.isRunning) break;
+
+      const messageCount = collectedMessages.length;
+      console.log(`[Cola] El usuario envió ${messageCount} mensaje(s). Esperando 20s para responder...`);
+
+      // 3. Responder la cantidad exacta de mensajes, respetando los 20 segundos iniciales y entre cada uno
+      for (let i = 0; i < messageCount; i++) {
+        if (!queueState.isRunning) break;
+
+        // Espera de 20 segundos antes de cada mensaje de respuesta
+        let waitTime = 0;
+        while (waitTime < 20 && queueState.isRunning) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          waitTime++;
+        }
+
+        if (!queueState.isRunning) break;
+
+        if (queueState.currentIndex >= items.length) {
+          queueState.currentIndex = 0;
+        }
+
+        const currentText = items[queueState.currentIndex];
+        queueState.currentIndex++;
+
+        try {
+          await channel.send(currentText);
+          console.log(`[Progreso Cola] Enviado ${queueState.currentIndex}/${items.length}`);
+        } catch (err) {
+          console.error('Error al enviar mensaje:', err);
+          break;
+        }
+      }
+
+      console.log('[Cola] Turno terminado. Volviendo a esperar al usuario...');
+
+    } catch (error) {
+      console.log('[Cola] Proceso cancelado o tiempo agotado.');
+      queueState.isRunning = false;
+      break;
+    }
+  }
+}
+
+client.login('MTU0ODg0NDQ5MzQ5MzYzNzE2Mg.GHiW-p.V3iZWOPKLfFCTC1j3rMLx_WMkTzYYMTDlFXTPo');

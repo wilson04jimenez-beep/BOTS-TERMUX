@@ -1,0 +1,15 @@
+node_modules/
+cookies.json
+cookies*.json
+*.session
+*.sessions
+auth/
+auth_info/
+sessions/
+tokens/
+.env
+.env.*
+.pm2/
+npm-debug.log*
+auth_info_baileys/
+cookies*

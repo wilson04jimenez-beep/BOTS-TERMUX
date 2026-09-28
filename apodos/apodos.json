@@ -1,0 +1,22 @@
+{
+  "general": {
+    "enabled": true,
+    "nickname": "SHAO R0MP3 EL C()L0 DE KAKADDIFAELA Y PUTOLIVER XD",
+    "groups": {
+      "1392516619444934": {
+        "enabled": true,
+        "name": ""
+      }
+    }
+  },
+  "specific": {
+    "enabled": true,
+    "users": {
+      "61594595696765": "SHAO DIOS INJURIANO NNT"
+    }
+  },
+  "watch": {
+    "enabled": true,
+    "intervalSeconds": 30
+  }
+}

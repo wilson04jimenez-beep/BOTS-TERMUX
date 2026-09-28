@@ -1,0 +1,245 @@
+import { Client } from 'meta-messenger.js';
+import fs from 'fs';
+
+// ======================================================
+// CONFIGURACIÓN
+// ======================================================
+
+const GROUPS = `
+3722834161226462
+9965525413507226
+1392516619444934
+1343488587757165
+1732267664508510
+`;
+
+const GROUP_NAME = 'SHAO DIOS DEL UNIVERSO Y FACEBOOK VIOLA A MONADDI, MONORDAN, KAKAFAELA Y A TODOS SU MARIDOS 🤑👌🐶';
+
+// Tiempo entre revisiones
+const CHECK_EVERY = 1 * 60 * 1000;
+
+// Tiempo entre grupos
+const DELAY_BETWEEN_GROUPS = 3000;
+
+// Foto del grupo
+const PHOTO_FILE = './KAKADDI.jpg';
+
+
+// ======================================================
+// PREPARAR GRUPOS
+// ======================================================
+
+const GROUP_IDS = GROUPS
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+
+// ======================================================
+// COMPROBAR ARCHIVOS
+// ======================================================
+
+if (!fs.existsSync('./cookies.json')) {
+    console.error('❌ No existe cookies.json');
+    process.exit(1);
+}
+
+if (!fs.existsSync(PHOTO_FILE)) {
+    console.error(`❌ No existe ${PHOTO_FILE}`);
+    process.exit(1);
+}
+
+const cookies = JSON.parse(
+    fs.readFileSync('./cookies.json', 'utf8')
+);
+
+const photo = fs.readFileSync(PHOTO_FILE);
+
+
+// ======================================================
+// CLIENTE
+// ======================================================
+
+const client = new Client(cookies, {
+    enableE2EE: false
+});
+
+
+// ======================================================
+// ESPERA
+// ======================================================
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+// ======================================================
+// PROCESAR UN GRUPO
+// ======================================================
+
+async function processGroup(groupId, number) {
+
+    console.log('');
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`👥 Grupo ${number}/${GROUP_IDS.length}`);
+    console.log(`🆔 ${groupId}`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+    // ----------------------------------------------
+    // CAMBIAR NOMBRE
+    // ----------------------------------------------
+
+    try {
+
+        await client.renameThread(
+            BigInt(groupId),
+            GROUP_NAME
+        );
+
+        console.log(`✅ Nombre → ${GROUP_NAME}`);
+
+    } catch (err) {
+
+        console.error(
+            `❌ Error cambiando nombre:`,
+            err?.message || err
+        );
+    }
+
+
+    // ----------------------------------------------
+    // CAMBIAR FOTO
+    // ----------------------------------------------
+
+    try {
+
+        await client.setGroupPhoto(
+            BigInt(groupId),
+            photo
+        );
+
+        console.log(`🖼️ Foto → KAKADDI.jpg`);
+
+    } catch (err) {
+
+        console.error(
+            `❌ Error cambiando foto:`,
+            err?.message || err
+        );
+    }
+}
+
+
+// ======================================================
+// REVISAR TODOS LOS GRUPOS
+// ======================================================
+
+async function reviewGroups() {
+
+    console.log('');
+    console.log('🔎 Revisando grupos...');
+    console.log(`📋 Total: ${GROUP_IDS.length}`);
+    console.log(`⏱️ Próxima revisión en ${CHECK_EVERY / 60000} minutos`);
+
+    for (let i = 0; i < GROUP_IDS.length; i++) {
+
+        await processGroup(
+            GROUP_IDS[i],
+            i + 1
+        );
+
+        // 3 segundos SOLO entre grupos
+        if (i < GROUP_IDS.length - 1) {
+            console.log('⏳ Esperando 3 segundos...');
+            await sleep(DELAY_BETWEEN_GROUPS);
+        }
+    }
+
+    console.log('');
+    console.log('✅ Revisión terminada');
+    console.log(
+        `⏰ Esperando ${CHECK_EVERY / 60000} minutos...`
+    );
+}
+
+
+// ======================================================
+// CONEXIÓN
+// ======================================================
+
+client.on('ready', () => {
+    console.log('✅ Socket conectado');
+});
+
+client.on('fullyReady', async () => {
+
+    console.log('');
+    console.log('✅ Messenger conectado');
+    console.log(`👤 Usuario: ${client.user?.name || 'Usuario'}`);
+    console.log(`👥 Grupos: ${GROUP_IDS.length}`);
+    console.log(`📝 Nombre: ${GROUP_NAME}`);
+    console.log(`🖼️ Foto: ${PHOTO_FILE}`);
+    console.log(`⏱️ Revisión: cada 5 minutos`);
+    console.log(`⏳ Entre grupos: 3 segundos`);
+
+    // Primera revisión inmediatamente
+    await reviewGroups();
+
+    // Siguiente revisión cada 5 minutos
+    setInterval(
+        reviewGroups,
+        CHECK_EVERY
+    );
+});
+
+
+// ======================================================
+// RECONEXIÓN / ERRORES
+// ======================================================
+
+client.on('reconnected', () => {
+    console.log('🔄 Reconectado');
+});
+
+client.on('disconnected', () => {
+    console.log('⚠️ Desconectado');
+});
+
+client.on('error', (err) => {
+    console.error(
+        '❌ Error:',
+        err?.message || err
+    );
+});
+
+
+// ======================================================
+// INICIAR
+// ======================================================
+
+try {
+
+    await client.connect();
+
+    console.log(
+        '👤 Conectado como:',
+        client.user?.name || 'Usuario'
+    );
+
+} catch (err) {
+
+    console.error(
+        '❌ Error al conectar:',
+        err?.message || err
+    );
+
+    process.exit(1);
+}
+
+
+// ======================================================
+// MANTENER NODE ACTIVO
+// ======================================================
+
+setInterval(() => {}, 60_000);
