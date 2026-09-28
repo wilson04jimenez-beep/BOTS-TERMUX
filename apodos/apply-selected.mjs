@@ -11,6 +11,9 @@ const groupIds = (process.env.APODOS_GROUPS || "")
     .filter(Boolean);
 
 const nickname = process.env.APODOS_NICKNAME || "";
+const UI = { reset:'\x1b[0m', cyan:'\x1b[36m', green:'\x1b[32m', yellow:'\x1b[33m', red:'\x1b[31m' };
+const ui = (c,t) => UI[c] + t + UI.reset;
+const panel = t => { console.log(''); console.log(ui('cyan','╔'+'═'.repeat(46)+'╗')); console.log(ui('cyan','║ '+t)); console.log(ui('cyan','╚'+'═'.repeat(46)+'╝')); };
 
 if (!groupIds.length) {
     console.error("❌ NO SE SELECCIONARON GRUPOS.");
@@ -70,7 +73,7 @@ PROCESO
 
 try {
 
-    console.log("\n🔌 CONECTANDO A MESSENGER...\n");
+    panel("✦ APODOS · APLICACIÓN SELECCIONADA ✦");\n    console.log(ui("cyan","🔌 CONECTANDO A MESSENGER..."));
 
     await client.connect();
 
