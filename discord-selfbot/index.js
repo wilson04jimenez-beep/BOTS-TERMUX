@@ -1,5 +1,17 @@
 const { Client } = require('discord.js-selfbot-v13');
 const fs = require('fs');
+const UI = {
+  reset: '\x1b[0m', cyan: '\x1b[36m', green: '\x1b[32m',
+  yellow: '\x1b[33m', red: '\x1b[31m', bold: '\x1b[1m'
+};
+const ui = (color, text) => UI[color] + text + UI.reset;
+const panel = title => {
+  console.log('');
+  console.log(ui('cyan', '╔' + '═'.repeat(52) + '╗'));
+  console.log(ui('cyan', '║ ' + title));
+  console.log(ui('cyan', '╚' + '═'.repeat(52) + '╝'));
+};
+
 
 const client = new Client({
   checkUpdate: false
@@ -130,7 +142,7 @@ function startXD1(channel, channelId, seconds, text, save = true) {
         const guildName = channel.guild ? channel.guild.name : 'Desconocido';
         const channelName = channel.name ? `#${channel.name}` : 'Desconocido';
 
-        console.log(`\n❌ [XD1] Missing Permissions`);
+        console.log(ui('red', '❌ [XD1] PERMISOS INSUFICIENTES'));
         console.log(`Servidor: ${guildName}`);
         console.log(`Canal: ${channelName}`);
         console.log(`ID: ${channelId}\n`);
@@ -175,7 +187,7 @@ function startXD2(channel, channelId, minutes, text, save = true) {
         const guildName = channel.guild ? channel.guild.name : 'Desconocido';
         const channelName = channel.name ? `#${channel.name}` : 'Desconocido';
 
-        console.log(`\n❌ [XD2] Missing Permissions`);
+        console.log(ui('red', '❌ [XD2] PERMISOS INSUFICIENTES'));
         console.log(`Servidor: ${guildName}`);
         console.log(`Canal: ${channelName}`);
         console.log(`ID: ${channelId}\n`);
@@ -213,7 +225,7 @@ async function checkPausedChannels() {
           const guildName = channel.guild ? channel.guild.name : 'Desconocido';
           const channelName = channel.name ? `#${channel.name}` : 'Desconocido';
 
-          console.log(`\n🟢 [Reanudación] Permisos restaurados detectados`);
+          console.log(ui('green', '🟢 REANUDACIÓN · PERMISOS RESTAURADOS'));
           console.log(`Servidor: ${guildName}`);
           console.log(`Canal: ${channelName}`);
           console.log(`ID: ${channelId}`);
@@ -235,9 +247,8 @@ async function checkPausedChannels() {
 // ======================================================
 
 client.on('ready', async () => {
-  console.log('=================================');
-  console.log('¡Conectado como ' + client.user.tag + '! (Bot Principal)');
-  console.log('=================================');
+  panel('✦ DISCORD SELF-BOT · CONECTADO ✦');
+  console.log(ui('green', '🟢 Cuenta: ' + client.user.tag));
   await restoreSavedStates();
   setInterval(checkPausedChannels, 60000);
 });
@@ -378,4 +389,4 @@ process.on('SIGINT', () => { saveState(); process.exit(0); });
 process.on('SIGTERM', () => { saveState(); process.exit(0); });
 
 loadState();
-client.login('MTUzMTQ3MjI4Nzk0ODA4MzM5Mw.G9dY4E.7GA4t0AxNC5y4X713B-dKxUMNW6SBCbkAEA-e4');
+client.login(process.env.DISCORD_TOKEN);
