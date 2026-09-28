@@ -7,6 +7,9 @@ const COOKIES_FILE =
     "/data/data/com.termux/files/home/messenger-bot/cookies.json";
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const UI = { reset:'\x1b[0m', cyan:'\x1b[36m', green:'\x1b[32m', yellow:'\x1b[33m', red:'\x1b[31m' };
+const ui = (c,t) => UI[c] + t + UI.reset;
+const panel = t => { console.log(''); console.log(ui('cyan','╔'+'═'.repeat(46)+'╗')); console.log(ui('cyan','║ '+t)); console.log(ui('cyan','╚'+'═'.repeat(46)+'╝')); };
 
 
 // ======================================================
@@ -60,30 +63,26 @@ async function main() {
 
 
     if (!config.watch?.enabled) {
-        console.log("🔴 VIGILANTE DESACTIVADO.");
+        console.log(ui("red","🔴 VIGILANTE DESACTIVADO."));
         return;
     }
 
 
     if (!config.specific?.enabled) {
-        console.log("🔴 APODOS ESPECÍFICOS DESACTIVADOS.");
+        console.log(ui("red","🔴 APODOS ESPECÍFICOS DESACTIVADOS."));
         return;
     }
 
 
     if (!Object.keys(config.specific?.users || {}).length) {
-        console.log("⚠️ NO HAY APODOS ESPECÍFICOS.");
+        console.log(ui("yellow","⚠️ NO HAY APODOS ESPECÍFICOS."));
         return;
     }
 
 
-    console.log("");
-    console.log("╔════════════════════════════════════════════╗");
-    console.log("║              XD VIGILANTE                  ║");
-    console.log("╚════════════════════════════════════════════╝");
-    console.log("");
+    panel("✦ XD VIGILANTE · APODOS ✦");
 
-    console.log("🔌 CONECTANDO A MESSENGER...");
+    console.log(ui("cyan","🔌 CONECTANDO A MESSENGER..."));
     console.log("");
 
 
