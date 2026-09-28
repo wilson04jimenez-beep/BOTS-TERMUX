@@ -5,11 +5,14 @@ const CONFIG_FILE = new URL("./apodos.json", import.meta.url);
 const COOKIES_FILE = "/data/data/com.termux/files/home/messenger-bot/cookies.json";
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const UI = { reset:'\x1b[0m', cyan:'\x1b[36m', green:'\x1b[32m', yellow:'\x1b[33m', red:'\x1b[31m' };
+const ui = (c,t) => UI[c] + t + UI.reset;
+const panel = t => { console.log(''); console.log(ui('cyan','╔'+'═'.repeat(46)+'╗')); console.log(ui('cyan','║ '+t)); console.log(ui('cyan','╚'+'═'.repeat(46)+'╝')); };
 
 const config = JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
 
 if (!config.general.enabled) {
-    console.log("❌ El apodo general está desactivado.");
+    console.log(ui("red","❌ El apodo general está desactivado."));
     process.exit(0);
 }
 
@@ -17,7 +20,7 @@ const raw = readFileSync(COOKIES_FILE, "utf8");
 const client = new Client(Utils.parseCookies(raw));
 
 try {
-    console.log("🔌 Conectando...");
+    panel("✦ APODOS · APLICACIÓN GENERAL ✦");\n    console.log(ui("cyan","🔌 Conectando..."));
     await client.connect();
 
     const groups = Object.entries(config.general.groups)
