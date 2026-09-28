@@ -12,6 +12,18 @@ const path = require('path');
 
 const AUTH_DIR = path.join(__dirname, 'auth');
 const BLOQUEADOS_FILE = path.join(__dirname, 'bloqueados.json');
+const UI = {
+    reset: '\x1b[0m', cyan: '\x1b[36m', green: '\x1b[32m',
+    yellow: '\x1b[33m', red: '\x1b[31m', bold: '\x1b[1m'
+};
+const ui = (color, text) => UI[color] + text + UI.reset;
+const panel = title => {
+    console.log('');
+    console.log(ui('cyan', '╔' + '═'.repeat(46) + '╗'));
+    console.log(ui('cyan', '║ ' + title));
+    console.log(ui('cyan', '╚' + '═'.repeat(46) + '╝'));
+};
+
 
 const activeTimers = new Map();
 let currentSock = null; // Referencia global para que los timers sobrevivan a las reconexiones
@@ -125,7 +137,7 @@ async function conectarWhatsApp() {
         const { connection, lastDisconnect, qr } = update;    
 
         if (qr) {    
-            console.log('\n📱 ESCANEA ESTE QR:\n');   
+            panel('📱 WHATSAPP · ESCANEA EL QR');   
             qrcode.generate(qr, { small: true });    
         }    
 
@@ -139,14 +151,14 @@ async function conectarWhatsApp() {
 
         if (connection === 'close') {    
             const statusCode = lastDisconnect?.error?.output?.statusCode;    
-            console.log(`⚠️ Conexión cerrada (Código: ${statusCode}). Reconectando...`);   
+            console.log(ui('yellow', `⚠️ Conexión cerrada · código ${statusCode} · reconectando...`));   
 
             if (statusCode !== DisconnectReason.loggedOut) {    
                 // Si es código 440 (conflicto de sesión), esperamos 10s para que WhatsApp libere el socket viejo
                 const tiempoEspera = (statusCode === 440) ? 10000 : 3000;
                 setTimeout(() => conectarWhatsApp(), tiempoEspera);    
             } else {    
-                console.log('❌ Sesión cerrada permanentemente. Borra la carpeta auth y vuelve a escanear.');    
+                console.log(ui('red', '❌ Sesión cerrada permanentemente · elimina auth y vuelve a escanear.'));    
             }    
         }    
     });    
