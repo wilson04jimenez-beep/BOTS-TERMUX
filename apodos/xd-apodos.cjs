@@ -4,6 +4,20 @@ const { execFileSync } = require("child_process");
 
 const CONFIG_FILE = __dirname + "/apodos.json";
 
+const UI = {
+    reset: "\x1b[0m",
+    cyan: "\x1b[36m",
+    green: "\x1b[32m",
+    yellow: "\x1b[33m",
+    red: "\x1b[31m",
+    bold: "\x1b[1m",
+    dim: "\x1b[2m"
+};
+
+function ui(color, text) {
+    return UI[color] + text + UI.reset;
+}
+
 function loadConfig() {
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
 
@@ -98,17 +112,17 @@ function header(title) {
     const width = 58;
 
     console.log("");
-    console.log("╔" + "═".repeat(width) + "╗");
+    console.log(ui("cyan", "╔" + "═".repeat(width) + "╗"));
     console.log(boxLine(""));
     console.log(boxLine(center(title, width)));
     console.log(boxLine(""));
-    console.log("╠" + "═".repeat(width) + "╣");
+    console.log(ui("cyan", "╠" + "═".repeat(width) + "╣"));
 }
 
 function footer() {
     const width = 58;
 
-    console.log("╚" + "═".repeat(width) + "╝");
+    console.log(ui("cyan", "╚" + "═".repeat(width) + "╝"));
     console.log("");
 }
 
@@ -157,7 +171,7 @@ function mostrarMenu(config) {
     const gruposTotal =
         grupos.length;
 
-    header("                 XD APODOS");
+    header("                 ✦ XD APODOS ✦");
 
     console.log(boxLine(""));
     console.log(
@@ -182,20 +196,20 @@ function mostrarMenu(config) {
 
     console.log("╠" + "═".repeat(58) + "╣");
 
-    console.log(boxLine("   [1]  VER GRUPOS"));
-    console.log(boxLine("   [2]  ACTIVAR / DESACTIVAR GENERAL"));
-    console.log(boxLine("   [3]  AGREGAR / MODIFICAR GRUPO"));
-    console.log(boxLine("   [4]  ELIMINAR GRUPO"));
+    console.log(ui("cyan", boxLine("   [1]  👥 VER GRUPOS")));
+    console.log(ui("white", boxLine("   [2]  ⚙️  ACTIVAR / DESACTIVAR GENERAL")));
+    console.log(ui("white", boxLine("   [3]  ➕ AGREGAR / MODIFICAR GRUPO")));
+    console.log(ui("red", boxLine("   [4]  🗑️  ELIMINAR GRUPO")));
     console.log(boxLine(""));
-    console.log(boxLine("   [5]  VER APODOS ESPECÍFICOS"));
-    console.log(boxLine("   [6]  AGREGAR / MODIFICAR ESPECÍFICO"));
-    console.log(boxLine("   [7]  ELIMINAR ESPECÍFICO"));
+    console.log(ui("white", boxLine("   [5]  🏷️  VER APODOS ESPECÍFICOS")));
+    console.log(ui("white", boxLine("   [6]  ✏️  AGREGAR / MODIFICAR ESPECÍFICO")));
+    console.log(ui("red", boxLine("   [7]  🗑️  ELIMINAR ESPECÍFICO")));
     console.log(boxLine(""));
-    console.log(boxLine("   [8]  APLICAR GENERAL AHORA"));
-    console.log(boxLine("   [9]  APLICAR APODO A GRUPOS"));
-    console.log(boxLine("   [10] ACTIVAR / DESACTIVAR VIGILANTE"));
+    console.log(ui("green", boxLine("   [8]  ⚡ APLICAR GENERAL AHORA")));
+    console.log(ui("green", boxLine("   [9]  🎯 APLICAR APODO A GRUPOS")));
+    console.log(ui("white", boxLine("   [10] 👁️  ACTIVAR / DESACTIVAR VIGILANTE")));
     console.log(boxLine(""));
-    console.log(boxLine("   [0]  SALIR"));
+    console.log(ui("red", boxLine("   [0]  🚪 SALIR")));
 
     footer();
 }
